@@ -1,7 +1,7 @@
 {
   "domain": "samsung_dms",
   "name": "Samsung DMS",
-  "codeowners": [],
+  "codeowners": ["@albertovincenzi"],
   "config_flow": true,
   "documentation": "https://github.com/albertovincenzi/ha_samsung_dms",
   "iot_class": "local_polling",
