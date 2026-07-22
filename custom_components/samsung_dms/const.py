@@ -22,6 +22,12 @@ DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
 # that silently failed for longer than necessary.
 OPTIMISTIC_TTL_SECONDS = 60
 
+# After a control command, poll again at these offsets (seconds) so a
+# DMS-confirmed value replaces the optimistic guess within a few seconds
+# instead of waiting for the next regular scan. The refresh debouncer
+# coalesces bursts, so these are upper bounds rather than exact fire times.
+CONFIRM_REFRESH_DELAYS = (4, 10)
+
 # The DMS speaks XML-over-POST but replies with JSON. All read *and* control
 # commands hit the same monitoring endpoint.
 PATH_LOGIN = "/dms2/Login.jsp"

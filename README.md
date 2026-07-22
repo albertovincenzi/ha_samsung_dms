@@ -22,11 +22,16 @@ Tested against DMS firmware `2.9.1.11`.
   - On/off, supply modes (standard / power / force)
   - Tank target & current temperature (tank limits respected)
   - Away mode (the DMS "go out" flag)
-- **Energy-recovery ventilators (pluserv) → `fan`**
+- **Energy-recovery ventilators (pluserv) → `fan` + `sensor`s**
   - On/off, fan speed (low / mid / high / turbo)
   - Ventilation mode as preset (auto / erv / normal / sleep)
+  - CO₂, outdoor / air / intake-air temperature sensors (created only when the
+    unit actually reports them)
 - **Per-unit `switch`** — remote-controller lock (disable the wall remote)
 - **Per-unit `binary_sensor`** — schedule active indicator
+- **Instant UI feedback** — commands are shown optimistically and confirmed by
+  a fast follow-up poll, so entities update immediately instead of waiting for
+  the next 30-second scan
 - Session auto-recovery (re-login on cookie expiry)
 
 ## Installation

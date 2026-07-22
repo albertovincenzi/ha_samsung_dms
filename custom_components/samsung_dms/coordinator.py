@@ -8,10 +8,12 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import SamsungDMSAuthError, SamsungDMSClient, SamsungDMSError
 from .const import (
+    CONFIRM_REFRESH_DELAYS,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_TYPE_INDOOR,
     DOMAIN,
@@ -121,4 +123,15 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             self.async_set_updated_data(patched)
 
         await self.client.async_control([addr], control_values)
+        await self.async_request_refresh()
+
+        # The DMS reflects a command a few seconds after it is issued. Poll
+        # again shortly after so the confirmed value replaces the optimistic
+        # guess quickly (and a silently-rejected command surfaces sooner),
+        # rather than waiting for the next 30s scan.
+        for delay in CONFIRM_REFRESH_DELAYS:
+            async_call_later(self.hass, delay, self._async_confirm_refresh)
+
+    async def _async_confirm_refresh(self, _now: Any) -> None:
+        """Trigger a post-command confirmation poll (debouncer-coalesced)."""
         await self.async_request_refresh()

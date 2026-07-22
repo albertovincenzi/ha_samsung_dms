@@ -40,6 +40,20 @@
       "scheduled": {
         "name": "Scheduled"
       }
+    },
+    "sensor": {
+      "co2": {
+        "name": "CO2"
+      },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
+      "air_temperature": {
+        "name": "Air temperature"
+      },
+      "intake_temperature": {
+        "name": "Intake air temperature"
+      }
     }
   }
 }
