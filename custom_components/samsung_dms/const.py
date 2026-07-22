@@ -47,3 +47,21 @@ HA_TO_FAN_SPEED = {v: k for k, v in FAN_SPEED_TO_HA.items()}
 # Absolute clamp used when a unit does not report per-mode limits.
 DEFAULT_MIN_TEMP = 16.0
 DEFAULT_MAX_TEMP = 30.0
+
+# --- Device classification (from tree-view ``indoorType``) ------------------
+DEVICE_TYPE_INDOOR = "indoor"
+DEVICE_TYPE_EHS = "ehs"  # heat pump / domestic-hot-water (water_heater)
+DEVICE_TYPE_PLUSERV = "pluserv"  # energy-recovery ventilator (fan)
+
+# --- EHS domestic hot water (DHW) -------------------------------------------
+DHW_OPERATION_OFF = "off"
+# Supply modes offered by the DMS DHW panel (values sent lower-cased).
+DHW_MODES = ["standard", "power", "force"]
+DEFAULT_TANK_MIN_TEMP = 30.0
+DEFAULT_TANK_MAX_TEMP = 70.0
+
+# --- Energy-recovery ventilator (pluserv) -----------------------------------
+# Ordered slow->fast; maps to a HA fan percentage.
+VENT_SPEEDS = ["low", "mid", "high", "turbo"]
+# Ventilation operating modes -> HA fan preset modes.
+VENT_MODES = ["auto", "erv", "normal", "sleep"]

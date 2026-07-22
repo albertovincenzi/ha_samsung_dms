@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
+    DEVICE_TYPE_INDOOR,
     DOMAIN,
     FAN_SPEED_TO_HA,
     HA_TO_FAN_SPEED,
@@ -69,7 +70,9 @@ async def async_setup_entry(
     """Set up climate entities from a config entry."""
     coordinator: SamsungDMSCoordinator = entry.runtime_data
     async_add_entities(
-        SamsungDMSClimate(coordinator, addr) for addr in coordinator.data
+        SamsungDMSClimate(coordinator, addr)
+        for addr in coordinator.data
+        if coordinator.device_type(addr) == DEVICE_TYPE_INDOOR
     )
 
 

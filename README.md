@@ -9,14 +9,22 @@ Tested against DMS firmware `2.9.1.11`.
 
 ## Features
 
-- Auto-discovers every indoor unit reported by the controller
-- Per-unit `climate` entity with:
+- Auto-discovers every unit reported by the controller and maps it to the
+  right Home Assistant platform, using the room labels configured on the DMS
+- **Indoor AC units → `climate`**
   - Power on/off
   - HVAC modes: cool, heat, dry, fan-only, auto
   - Fan speed: auto / low / medium / high
   - Target temperature (per-mode limits respected)
   - Room temperature readout
   - Error, filter-warning, remote-lock and schedule attributes
+- **EHS / hydro units → `water_heater`** (domestic hot water)
+  - On/off, supply modes (standard / power / force)
+  - Tank target & current temperature (tank limits respected)
+  - Away mode (the DMS "go out" flag)
+- **Energy-recovery ventilators (pluserv) → `fan`**
+  - On/off, fan speed (low / mid / high / turbo)
+  - Ventilation mode as preset (auto / erv / normal / sleep)
 - Session auto-recovery (re-login on cookie expiry)
 
 ## Installation
@@ -82,11 +90,10 @@ integration speaks the same protocol directly.
 
 ## Not yet implemented
 
-- EHS / hydro (hot-water) units as `water_heater` entities
+- The space-heating (water-out) side of EHS units as a separate `climate`
+  entity (currently only the domestic-hot-water side is exposed)
 - Vertical/horizontal swing controls
 - Schedules and use-restriction (remote lock) as switches
-- Friendly per-unit names from the tree view (units default to their address;
-  rename them in Home Assistant)
 
 ## Disclaimer
 

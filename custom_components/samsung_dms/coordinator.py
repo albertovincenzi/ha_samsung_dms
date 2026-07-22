@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import SamsungDMSAuthError, SamsungDMSClient, SamsungDMSError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DEVICE_TYPE_INDOOR, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +35,15 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.entry = entry
         # addr -> {name, sub_type, indoor_type, model_code, version}
         self.metadata: dict[str, dict[str, Any]] = {}
+
+    def device_type(self, addr: str) -> str:
+        """Return the device class for an address.
+
+        One of ``indoor`` / ``ehs`` / ``pluserv``. Falls back to ``indoor``
+        when metadata is unavailable, so units always get at least a climate
+        entity.
+        """
+        return self.metadata.get(addr, {}).get("indoor_type", DEVICE_TYPE_INDOOR)
 
     async def async_load_metadata(self) -> None:
         """Load per-unit labels/models once at setup (best-effort)."""

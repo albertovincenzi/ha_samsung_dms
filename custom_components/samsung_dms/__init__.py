@@ -27,7 +27,11 @@ from .coordinator import SamsungDMSCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE]
+PLATFORMS: list[Platform] = [
+    Platform.CLIMATE,
+    Platform.WATER_HEATER,
+    Platform.FAN,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
