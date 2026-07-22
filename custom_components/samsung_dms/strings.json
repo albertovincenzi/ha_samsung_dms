@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Samsung DMS",
+        "description": "Connect to your Samsung DMS2.5 local controller.",
+        "data": {
+          "host": "Host or IP address",
+          "username": "Username",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "host": "For example 192.168.1.5",
+          "verify_ssl": "Leave off — the DMS uses a self-signed certificate."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the DMS.",
+      "invalid_auth": "Invalid username or password.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This DMS is already configured."
+    }
+  }
+}

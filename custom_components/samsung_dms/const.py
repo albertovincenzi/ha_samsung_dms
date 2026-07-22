@@ -1,0 +1,49 @@
+"""Constants for the Samsung DMS integration."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+DOMAIN = "samsung_dms"
+
+# Config entry keys
+CONF_HOST = "host"
+CONF_USERNAME = "username"
+CONF_PASSWORD = "password"
+CONF_VERIFY_SSL = "verify_ssl"
+
+DEFAULT_USERNAME = "admin"
+DEFAULT_VERIFY_SSL = False
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+
+# The DMS speaks XML-over-POST but replies with JSON. All read *and* control
+# commands hit the same monitoring endpoint.
+PATH_LOGIN = "/dms2/Login.jsp"
+PATH_ROOT = "/dms2/"
+PATH_MONITORING = "/dms2/getMonitoring?currentPage=main"
+PATH_TREEVIEW = "/dms2/getTreeView?currentPage=main"
+
+# --- Samsung <-> Home Assistant enum mappings -------------------------------
+
+# Samsung operationMode value -> HA HVACMode string (kept as plain strings here
+# to avoid importing HA enums into the pure-protocol layer; climate.py maps to
+# the real enums).
+DMS_MODE_COOL = "cool"
+DMS_MODE_HEAT = "heat"
+DMS_MODE_DRY = "dry"
+DMS_MODE_FAN = "fan"
+DMS_MODE_AUTO = "auto"
+
+# Samsung fanSpeed <-> HA fan mode label
+FAN_SPEED_TO_HA = {
+    "low": "low",
+    "mid": "medium",
+    "high": "high",
+    "auto": "auto",
+    "turbo": "turbo",
+}
+HA_TO_FAN_SPEED = {v: k for k, v in FAN_SPEED_TO_HA.items()}
+
+# Absolute clamp used when a unit does not report per-mode limits.
+DEFAULT_MIN_TEMP = 16.0
+DEFAULT_MAX_TEMP = 30.0
