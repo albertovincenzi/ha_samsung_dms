@@ -73,11 +73,16 @@ class SamsungDMSRemoteLock(CoordinatorEntity[SamsungDMSCoordinator], SwitchEntit
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Lock the remote (disable it)."""
-        await self.coordinator.async_send_control(self._addr, {"remocon": "false"})
+        # Control tag is ``remocon``; monitoring reports it as ``remoconEnable``.
+        await self.coordinator.async_send_control(
+            self._addr, {"remocon": "false"}, optimistic={"remoconEnable": "false"}
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Unlock the remote (enable it)."""
-        await self.coordinator.async_send_control(self._addr, {"remocon": "true"})
+        await self.coordinator.async_send_control(
+            self._addr, {"remocon": "true"}, optimistic={"remoconEnable": "true"}
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

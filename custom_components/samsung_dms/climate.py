@@ -276,8 +276,9 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
+        value = f"{float(temp):.1f}"
         await self.coordinator.async_send_control(
-            self._addr, {"setTemp": f"{float(temp):.1f}"}
+            self._addr, {"setTemp": value}, optimistic={"setTemp": value}
         )
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
@@ -285,19 +286,29 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
         speed = HA_TO_FAN_SPEED.get(fan_mode)
         if speed is None:
             return
-        await self.coordinator.async_send_control(self._addr, {"fanSpeed": speed})
+        await self.coordinator.async_send_control(
+            self._addr, {"fanSpeed": speed}, optimistic={"fanSpeed": speed}
+        )
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set a new HVAC mode (handles power on/off)."""
         if hvac_mode == HVACMode.OFF:
-            await self.coordinator.async_send_control(self._addr, {"power": "off"})
+            await self.coordinator.async_send_control(
+                self._addr, {"power": "off"}, optimistic={"power": "off"}
+            )
             return
 
         dms_mode = HVAC_TO_DMS.get(hvac_mode)
         control: dict[str, str] = {"power": "on"}
+        # Monitoring reports the mode as ``opMode``; the control tag is
+        # ``operationMode``.
+        optimistic: dict[str, str] = {"power": "on"}
         if dms_mode is not None:
             control["operationMode"] = dms_mode
-        await self.coordinator.async_send_control(self._addr, control)
+            optimistic["opMode"] = dms_mode
+        await self.coordinator.async_send_control(
+            self._addr, control, optimistic=optimistic
+        )
 
     async def async_set_swing_mode(self, swing_mode: str) -> None:
         """Set the vane swing (mirrors the DMS UD/LR command)."""
@@ -306,17 +317,22 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
         ud = "true" if swing_mode in (SWING_VERTICAL, SWING_BOTH) else "false"
         lr = "true" if swing_mode in (SWING_HORIZONTAL, SWING_BOTH) else "false"
         # The DMS wind-direction command always carries both vane flags.
+        vanes = {"airSwing_UD": ud, "airSwing_LR": lr}
         await self.coordinator.async_send_control(
-            self._addr, {"airSwing_UD": ud, "airSwing_LR": lr}
+            self._addr, vanes, optimistic=vanes
         )
 
     async def async_turn_on(self) -> None:
         """Turn the unit on."""
-        await self.coordinator.async_send_control(self._addr, {"power": "on"})
+        await self.coordinator.async_send_control(
+            self._addr, {"power": "on"}, optimistic={"power": "on"}
+        )
 
     async def async_turn_off(self) -> None:
         """Turn the unit off."""
-        await self.coordinator.async_send_control(self._addr, {"power": "off"})
+        await self.coordinator.async_send_control(
+            self._addr, {"power": "off"}, optimistic={"power": "off"}
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -432,27 +448,40 @@ class SamsungDMSWaterOutClimate(
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
+        # Control tag is ``setWaterOutTemp``; monitoring reports the setpoint
+        # under ``waterOutSetTemp``.
+        value = f"{float(temp):.1f}"
         await self.coordinator.async_send_control(
-            self._addr, {"setWaterOutTemp": f"{float(temp):.1f}"}
+            self._addr,
+            {"setWaterOutTemp": value},
+            optimistic={_WATEROUT_SET_FIELD: value},
         )
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set a new mode (handles power on/off)."""
         if hvac_mode == HVACMode.OFF:
-            await self.coordinator.async_send_control(self._addr, {"power": "off"})
+            await self.coordinator.async_send_control(
+                self._addr, {"power": "off"}, optimistic={"power": "off"}
+            )
             return
         dms_mode = "cool" if hvac_mode == HVACMode.COOL else "heat"
         await self.coordinator.async_send_control(
-            self._addr, {"power": "on", "operationMode": dms_mode}
+            self._addr,
+            {"power": "on", "operationMode": dms_mode},
+            optimistic={"power": "on", "opMode": dms_mode},
         )
 
     async def async_turn_on(self) -> None:
         """Turn the space-heating side on."""
-        await self.coordinator.async_send_control(self._addr, {"power": "on"})
+        await self.coordinator.async_send_control(
+            self._addr, {"power": "on"}, optimistic={"power": "on"}
+        )
 
     async def async_turn_off(self) -> None:
         """Turn the space-heating side off."""
-        await self.coordinator.async_send_control(self._addr, {"power": "off"})
+        await self.coordinator.async_send_control(
+            self._addr, {"power": "off"}, optimistic={"power": "off"}
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

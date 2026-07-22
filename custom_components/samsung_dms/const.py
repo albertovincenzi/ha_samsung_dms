@@ -16,6 +16,12 @@ DEFAULT_USERNAME = "admin"
 DEFAULT_VERIFY_SSL = False
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
 
+# How long to keep an optimistically-set value on top of poll results before
+# accepting the DMS's own reported state. Two poll cycles: enough for the
+# device to actuate and be reflected in monitoring, without masking a command
+# that silently failed for longer than necessary.
+OPTIMISTIC_TTL_SECONDS = 60
+
 # The DMS speaks XML-over-POST but replies with JSON. All read *and* control
 # commands hit the same monitoring endpoint.
 PATH_LOGIN = "/dms2/Login.jsp"

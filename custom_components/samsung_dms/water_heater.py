@@ -131,43 +131,56 @@ class SamsungDMSWaterHeater(
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is None:
             return
+        value = f"{float(temp):.1f}"
         await self.coordinator.async_send_control(
-            self._addr, {"setHotWaterSupplyTemp": f"{float(temp):.1f}"}
+            self._addr,
+            {"setHotWaterSupplyTemp": value},
+            optimistic={"setHotWaterSupplyTemp": value},
         )
 
     async def async_set_operation_mode(self, operation_mode: str) -> None:
         """Set a new DHW operation mode (or turn off)."""
         if operation_mode == STATE_OFF:
             await self.coordinator.async_send_control(
-                self._addr, {"hotWaterSupplyPower": "off"}
+                self._addr,
+                {"hotWaterSupplyPower": "off"},
+                optimistic={"hotWaterSupplyPower": "off"},
             )
             return
         if operation_mode not in DHW_MODES:
             return
+        control = {"hotWaterSupplyPower": "on", "hotWaterSupplyMode": operation_mode}
         await self.coordinator.async_send_control(
-            self._addr,
-            {"hotWaterSupplyPower": "on", "hotWaterSupplyMode": operation_mode},
+            self._addr, control, optimistic=control
         )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn DHW on."""
         await self.coordinator.async_send_control(
-            self._addr, {"hotWaterSupplyPower": "on"}
+            self._addr,
+            {"hotWaterSupplyPower": "on"},
+            optimistic={"hotWaterSupplyPower": "on"},
         )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn DHW off."""
         await self.coordinator.async_send_control(
-            self._addr, {"hotWaterSupplyPower": "off"}
+            self._addr,
+            {"hotWaterSupplyPower": "off"},
+            optimistic={"hotWaterSupplyPower": "off"},
         )
 
     async def async_turn_away_mode_on(self) -> None:
         """Enable away ('go out') mode."""
-        await self.coordinator.async_send_control(self._addr, {"goOut": "on"})
+        await self.coordinator.async_send_control(
+            self._addr, {"goOut": "on"}, optimistic={"goOut": "on"}
+        )
 
     async def async_turn_away_mode_off(self) -> None:
         """Disable away ('go out') mode."""
-        await self.coordinator.async_send_control(self._addr, {"goOut": "off"})
+        await self.coordinator.async_send_control(
+            self._addr, {"goOut": "off"}, optimistic={"goOut": "off"}
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

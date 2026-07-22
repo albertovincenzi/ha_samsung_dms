@@ -98,22 +98,43 @@ class SamsungDMSVentilator(CoordinatorEntity[SamsungDMSCoordinator], FanEntity):
         mode = self._unit.get("ventilationMode")
         return mode if mode in VENT_MODES else None
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose ERV diagnostics for dashboards and automations.
+
+        Only fields the unit actually reports are included, so a model that
+        omits e.g. a filter indicator simply won't surface that attribute.
+        """
+        unit = self._unit
+        raw = {
+            "address": self._addr,
+            "error": unit.get("error"),
+            "filter_warning": unit.get("filterWarning"),
+            "remote_control_enabled": unit.get("remoconEnable"),
+            "scheduled": unit.get("isScheduled"),
+            "ventilation_mode": unit.get("ventilationMode"),
+            "fan_speed": unit.get("ventilationFanSpeed"),
+        }
+        return {key: value for key, value in raw.items() if value is not None}
+
     async def async_set_percentage(self, percentage: int) -> None:
         """Set the ventilation fan speed."""
         if percentage == 0:
             await self.async_turn_off()
             return
         speed = percentage_to_ordered_list_item(VENT_SPEEDS, percentage)
+        control = {"power": "on", "ventilationFanSpeed": speed}
         await self.coordinator.async_send_control(
-            self._addr, {"power": "on", "ventilationFanSpeed": speed}
+            self._addr, control, optimistic=control
         )
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set the ventilation mode."""
         if preset_mode not in VENT_MODES:
             return
+        control = {"power": "on", "ventilationMode": preset_mode}
         await self.coordinator.async_send_control(
-            self._addr, {"power": "on", "ventilationMode": preset_mode}
+            self._addr, control, optimistic=control
         )
 
     async def async_turn_on(
@@ -130,11 +151,15 @@ class SamsungDMSVentilator(CoordinatorEntity[SamsungDMSCoordinator], FanEntity):
             control["ventilationFanSpeed"] = percentage_to_ordered_list_item(
                 VENT_SPEEDS, percentage
             )
-        await self.coordinator.async_send_control(self._addr, control)
+        await self.coordinator.async_send_control(
+            self._addr, control, optimistic=control
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the ventilator off."""
-        await self.coordinator.async_send_control(self._addr, {"power": "off"})
+        await self.coordinator.async_send_control(
+            self._addr, {"power": "off"}, optimistic={"power": "off"}
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:
