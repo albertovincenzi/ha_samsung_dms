@@ -1,10 +1,22 @@
-"""Binary sensor platform: per-unit schedule-active indicator."""
+"""Binary sensor platform for Samsung DMS.
+
+Per indoor/EHS/ERV unit: schedule-active, fault, and filter-cleaning
+indicators. Plus the outdoor-unit running / comm-error / maintenance sensors.
+The fault and filter sensors use the ``problem`` device class so they can drive
+Home Assistant warnings directly.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+    BinarySensorEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
@@ -14,6 +26,38 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SamsungDMSCoordinator
+from .outdoor import build_outdoor_binary_sensors
+
+
+@dataclass(frozen=True, kw_only=True)
+class DMSBinaryDescription(BinarySensorEntityDescription):
+    """Describes a per-unit binary sensor."""
+
+    is_on_fn: Callable[[dict[str, Any]], bool]
+
+
+UNIT_BINARY_SENSORS: tuple[DMSBinaryDescription, ...] = (
+    DMSBinaryDescription(
+        key="scheduled",
+        translation_key="scheduled",
+        icon="mdi:calendar-clock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=lambda u: u.get("isScheduled") == "true",
+    ),
+    DMSBinaryDescription(
+        key="fault",
+        translation_key="fault",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        is_on_fn=lambda u: u.get("error") == "true",
+    ),
+    DMSBinaryDescription(
+        key="filter",
+        translation_key="filter",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:air-filter",
+        is_on_fn=lambda u: u.get("filterWarning") == "true",
+    ),
+)
 
 
 async def async_setup_entry(
@@ -21,28 +65,36 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up a schedule-active binary sensor for every unit."""
+    """Set up per-unit and outdoor binary sensors."""
     coordinator: SamsungDMSCoordinator = entry.runtime_data
-    async_add_entities(
-        SamsungDMSScheduleSensor(coordinator, addr) for addr in coordinator.data
-    )
+    entities: list[BinarySensorEntity] = [
+        SamsungDMSUnitBinary(coordinator, addr, description)
+        for addr in coordinator.data
+        for description in UNIT_BINARY_SENSORS
+    ]
+    entities.extend(build_outdoor_binary_sensors(coordinator))
+    async_add_entities(entities)
 
 
-class SamsungDMSScheduleSensor(
+class SamsungDMSUnitBinary(
     CoordinatorEntity[SamsungDMSCoordinator], BinarySensorEntity
 ):
-    """Indicates whether a DMS schedule is currently active for the unit."""
+    """A per-unit boolean indicator (schedule / fault / filter)."""
 
     _attr_has_entity_name = True
-    _attr_translation_key = "scheduled"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:calendar-clock"
+    entity_description: DMSBinaryDescription
 
-    def __init__(self, coordinator: SamsungDMSCoordinator, addr: str) -> None:
-        """Initialise the sensor for a given address."""
+    def __init__(
+        self,
+        coordinator: SamsungDMSCoordinator,
+        addr: str,
+        description: DMSBinaryDescription,
+    ) -> None:
+        """Initialise the sensor for a given address and metric."""
         super().__init__(coordinator)
         self._addr = addr
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_{addr}_scheduled"
+        self.entity_description = description
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_{addr}_{description.key}"
 
         meta = coordinator.metadata.get(addr, {})
         self._attr_device_info = DeviceInfo(
@@ -62,8 +114,8 @@ class SamsungDMSScheduleSensor(
 
     @property
     def is_on(self) -> bool:
-        """Return True when a schedule is active for this unit."""
-        return self._unit.get("isScheduled") == "true"
+        """Return the indicator state."""
+        return self.entity_description.is_on_fn(self._unit)
 
     @callback
     def _handle_coordinator_update(self) -> None:

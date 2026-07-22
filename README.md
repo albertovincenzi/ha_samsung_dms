@@ -32,7 +32,20 @@ Tested against DMS firmware `2.9.1.11`.
     exposes no way to control them, so they are surfaced as sensors, not a
     thermostat
 - **Per-unit `switch`** — remote-controller lock (disable the wall remote)
-- **Per-unit `binary_sensor`** — schedule active indicator
+- **Per-unit `binary_sensor`s** — schedule active, **Fault** and **Filter**
+  (both `problem` class, so they can trigger Home Assistant warnings directly;
+  Filter = the unit's filter-hours alarm = cleaning due)
+- **Outdoor units → a diagnostic device** with a VRF health readout:
+  - Raw cycle telemetry: outside / discharge / IPM temperature, high & low
+    pressure, compressor current, frequency and run-hours
+  - Engineer's derived metrics: condensing & evaporating temperature, condenser
+    **approach** (coil-fouling indicator), suction **superheat**
+  - A **Health status** sensor (OK / Warning / Alert) that reads the refrigerant
+    cycle like a service technician — flags a dirty condenser, high discharge
+    temperature, inverter overheating, low charge or communication faults, with
+    a plain-language `issues` attribute
+  - Compressor-running, communication-error and maintenance-required
+    binary sensors
 - **Instant UI feedback** — commands are shown optimistically and confirmed by
   a fast follow-up poll, so entities update immediately instead of waiting for
   the next 30-second scan

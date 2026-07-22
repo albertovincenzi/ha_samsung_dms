@@ -39,6 +39,21 @@
     "binary_sensor": {
       "scheduled": {
         "name": "Scheduled"
+      },
+      "fault": {
+        "name": "Fault"
+      },
+      "filter": {
+        "name": "Filter"
+      },
+      "compressor": {
+        "name": "Compressor"
+      },
+      "communication_error": {
+        "name": "Communication error"
+      },
+      "maintenance": {
+        "name": "Maintenance required"
       }
     },
     "sensor": {
@@ -59,6 +74,50 @@
       },
       "operating_mode": {
         "name": "Operating mode"
+      },
+      "outside_temperature": {
+        "name": "Outside temperature"
+      },
+      "discharge_temperature": {
+        "name": "Discharge temperature"
+      },
+      "ipm_temperature": {
+        "name": "Inverter (IPM) temperature"
+      },
+      "compressor_current": {
+        "name": "Compressor current"
+      },
+      "compressor_frequency": {
+        "name": "Compressor frequency"
+      },
+      "high_pressure": {
+        "name": "High pressure"
+      },
+      "low_pressure": {
+        "name": "Low pressure"
+      },
+      "compressor_hours": {
+        "name": "Compressor run hours"
+      },
+      "condensing_temperature": {
+        "name": "Condensing temperature"
+      },
+      "evaporating_temperature": {
+        "name": "Evaporating temperature"
+      },
+      "condenser_approach": {
+        "name": "Condenser approach"
+      },
+      "suction_superheat": {
+        "name": "Suction superheat"
+      },
+      "health_status": {
+        "name": "Health status",
+        "state": {
+          "ok": "OK",
+          "warning": "Warning",
+          "alert": "Alert"
+        }
       }
     }
   }

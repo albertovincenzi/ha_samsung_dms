@@ -21,6 +21,7 @@ from typing import Any
 import aiohttp
 
 from .const import (
+    PATH_CYCLE,
     PATH_LOGIN,
     PATH_MONITORING,
     PATH_ROOT,
@@ -207,6 +208,62 @@ class SamsungDMSClient:
         """Return the raw tree-view payload (device hierarchy + labels)."""
         body = _envelope("<treeInfoEx range='all' />")
         return await self._post(PATH_TREEVIEW, body)
+
+    async def async_get_outdoor_addresses(self) -> list[str]:
+        """Return the outdoor-unit addresses from the tree view."""
+        tree = await self.async_get_tree()
+        return [
+            entry["addr"]
+            for entry in tree.get("treeOutDoor", [])
+            if entry.get("addr")
+        ]
+
+    async def async_get_cycle_monitoring(
+        self, outdoor_addrs: list[str]
+    ) -> dict[str, dict[str, Any]]:
+        """Return outdoor-unit cycle/diagnostic data keyed by address.
+
+        Each value flattens the outdoor node with its compressor ``unitDetail``
+        (pressures, temperatures, currents, IPM, run hours, etc.) and adds a
+        ``commError`` flag when the DMS reports a communication error.
+        """
+        if not outdoor_addrs:
+            return {}
+        outer = "".join(f"<outdoor addr='{a}' />" for a in outdoor_addrs)
+        payload = (
+            "<getCycleMonitoring>"
+            f"<outdoorList>{outer}</outdoorList>"
+            "<indoorList></indoorList>"
+            "</getCycleMonitoring>"
+        )
+        data = await self._post(PATH_CYCLE, _envelope(payload))
+
+        comm_errors = {
+            e.get("addr")
+            for e in data.get("commErrorList", [])
+            if isinstance(e, dict) and e.get("addr")
+        }
+
+        result: dict[str, dict[str, Any]] = {}
+        for outdoor in data.get("outdoorList", []):
+            addr = outdoor.get("addr")
+            if not addr:
+                continue
+            merged: dict[str, Any] = {
+                k: v for k, v in outdoor.items() if k != "child"
+            }
+            # Descend outdoor -> unit -> unitDetail for the cycle values.
+            units = outdoor.get("child") or []
+            unit = units[0] if units else {}
+            details = unit.get("child") or []
+            if details:
+                merged.update(
+                    {k: v for k, v in details[0].items() if k != "nodeName"}
+                )
+            merged["addr"] = addr
+            merged["commError"] = addr in comm_errors
+            result[addr] = merged
+        return result
 
     async def async_get_indoor_metadata(self) -> dict[str, dict[str, Any]]:
         """Return per-unit metadata keyed by address.

@@ -31,6 +31,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEVICE_TYPE_PLUSERV, DOMAIN
 from .coordinator import SamsungDMSCoordinator
+from .outdoor import build_outdoor_sensors
 
 _INVALID_TEMP = -1000.0
 
@@ -126,13 +127,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up ERV sensors for pluserv units that report the source field."""
     coordinator: SamsungDMSCoordinator = entry.runtime_data
-    entities: list[SamsungDMSSensor] = []
+    entities: list[SensorEntity] = []
     for addr, unit in coordinator.data.items():
         if coordinator.device_type(addr) != DEVICE_TYPE_PLUSERV:
             continue
         for description in SENSOR_TYPES:
             if _present(unit.get(description.source), text=description.text):
                 entities.append(SamsungDMSSensor(coordinator, addr, description))
+    entities.extend(build_outdoor_sensors(coordinator))
     async_add_entities(entities)
 
 

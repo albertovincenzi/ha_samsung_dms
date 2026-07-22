@@ -34,6 +34,8 @@ PATH_LOGIN = "/dms2/Login.jsp"
 PATH_ROOT = "/dms2/"
 PATH_MONITORING = "/dms2/getMonitoring?currentPage=main"
 PATH_TREEVIEW = "/dms2/getTreeView?currentPage=main"
+# Outdoor "cycle monitoring" data — note the DMS's own spelling of the path.
+PATH_CYCLE = "/dms2/getControlMonitring"
 
 # --- Samsung <-> Home Assistant enum mappings -------------------------------
 

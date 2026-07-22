@@ -19,6 +19,7 @@ from .const import (
     DOMAIN,
     OPTIMISTIC_TTL_SECONDS,
 )
+from .diagnostics import assess_outdoor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,6 +44,9 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.entry = entry
         # addr -> {name, sub_type, indoor_type, model_code, version}
         self.metadata: dict[str, dict[str, Any]] = {}
+        # Outdoor units: addresses + latest cycle data (with computed health).
+        self.outdoor_addrs: list[str] = []
+        self.outdoor: dict[str, dict[str, Any]] = {}
         # Pending optimistic overrides (monitoring-key space) applied on top of
         # each poll until the DMS confirms them or they age out. Keyed by addr.
         self._optimistic: dict[str, dict[str, Any]] = {}
@@ -58,12 +62,17 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         return self.metadata.get(addr, {}).get("indoor_type", DEVICE_TYPE_INDOOR)
 
     async def async_load_metadata(self) -> None:
-        """Load per-unit labels/models once at setup (best-effort)."""
+        """Load per-unit labels/models and outdoor addresses once at setup."""
         try:
             self.metadata = await self.client.async_get_indoor_metadata()
         except SamsungDMSError as err:
             _LOGGER.warning("Could not load Samsung DMS device names: %s", err)
             self.metadata = {}
+        try:
+            self.outdoor_addrs = await self.client.async_get_outdoor_addresses()
+        except SamsungDMSError as err:
+            _LOGGER.warning("Could not load Samsung DMS outdoor units: %s", err)
+            self.outdoor_addrs = []
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch the latest monitoring snapshot, keyed by address."""
@@ -75,11 +84,33 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         except SamsungDMSError as err:
             raise UpdateFailed(f"Error communicating with DMS: {err}") from err
 
+        await self._async_update_outdoor()
+
         return {
             unit["addr"]: self._apply_optimistic(unit["addr"], unit)
             for unit in units
             if unit.get("addr")
         }
+
+    async def _async_update_outdoor(self) -> None:
+        """Refresh outdoor cycle data and compute health (best-effort).
+
+        Outdoor telemetry is auxiliary — a failure here must not fail the whole
+        update, so it is logged and the previous snapshot is kept.
+        """
+        if not self.outdoor_addrs:
+            return
+        try:
+            cycle = await self.client.async_get_cycle_monitoring(self.outdoor_addrs)
+        except SamsungDMSError as err:
+            _LOGGER.debug("Outdoor cycle poll failed: %s", err)
+            return
+        for addr, unit in cycle.items():
+            health = assess_outdoor(unit)
+            unit["health_status"] = health.status
+            unit["health_issues"] = list(health.issues)
+            unit["health_metrics"] = health.metrics
+        self.outdoor = cycle
 
     def _apply_optimistic(
         self, addr: str, unit: dict[str, Any]
