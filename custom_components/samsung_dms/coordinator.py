@@ -3,23 +3,27 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from time import monotonic
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import SamsungDMSAuthError, SamsungDMSClient, SamsungDMSError
 from .const import (
+    CONF_SCAN_INTERVAL,
     CONFIRM_REFRESH_DELAYS,
-    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
     DEVICE_TYPE_INDOOR,
     DOMAIN,
     OPTIMISTIC_TTL_SECONDS,
 )
-from .diagnostics import assess_outdoor
+from .vrf_health import assess_outdoor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,11 +38,14 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         client: SamsungDMSClient,
     ) -> None:
         """Initialise the coordinator."""
+        seconds = entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
+        )
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=DEFAULT_SCAN_INTERVAL,
+            update_interval=timedelta(seconds=seconds),
         )
         self.client = client
         self.entry = entry
@@ -61,6 +68,33 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         """
         return self.metadata.get(addr, {}).get("indoor_type", DEVICE_TYPE_INDOOR)
 
+    def outdoor_parent(self, addr: str) -> str | None:
+        """Return the outdoor unit that owns an indoor/ERV/EHS address.
+
+        DMS addresses are ``system.channel.node``; every unit on a refrigerant
+        circuit shares the ``system.channel`` prefix with its outdoor unit,
+        whose node is ``00``. Returns ``None`` when no distinct outdoor unit is
+        known (so we never link a device to itself or to a missing parent).
+        """
+        parts = addr.split(".")
+        if len(parts) != 3:
+            return None
+        parent = f"{parts[0]}.{parts[1]}.00"
+        if parent == addr or parent not in self.outdoor_addrs:
+            return None
+        return parent
+
+    def with_via_device(self, info: DeviceInfo, addr: str) -> DeviceInfo:
+        """Attach a ``via_device`` link to the unit's outdoor unit, if any.
+
+        Nests indoor units, ERVs and the EHS under their condensing unit in the
+        HA device tree. Left untouched when the parent is unknown.
+        """
+        parent = self.outdoor_parent(addr)
+        if parent is not None:
+            info["via_device"] = (DOMAIN, f"{self.entry.entry_id}_outdoor_{parent}")
+        return info
+
     async def async_load_metadata(self) -> None:
         """Load per-unit labels/models and outdoor addresses once at setup."""
         try:
@@ -79,8 +113,9 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         try:
             units = await self.client.async_get_monitoring()
         except SamsungDMSAuthError as err:
-            # Surface as UpdateFailed; the client already retried a re-login.
-            raise UpdateFailed(f"Authentication failed: {err}") from err
+            # The client already retried a re-login, so credentials are stale:
+            # raise ConfigEntryAuthFailed to trigger Home Assistant's reauth flow.
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except SamsungDMSError as err:
             raise UpdateFailed(f"Error communicating with DMS: {err}") from err
 

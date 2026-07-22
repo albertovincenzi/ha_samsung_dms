@@ -37,7 +37,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import SamsungDMSCoordinator
-from .diagnostics import STATUS_OK
+from .vrf_health import STATUS_OK
 
 _INVALID = -999.0
 _KGFCM2_TO_BAR = 0.980665
@@ -155,7 +155,7 @@ OUTDOOR_SENSORS: tuple[OutdoorSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=round,
     ),
-    # Engineer's derived metrics (from diagnostics.assess_outdoor).
+    # Engineer's derived metrics (from vrf_health.assess_outdoor).
     OutdoorSensorDescription(
         key="condensing_temperature",
         source="condensing_temperature",

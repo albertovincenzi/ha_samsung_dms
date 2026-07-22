@@ -67,6 +67,7 @@ class SamsungDMSVentilator(CoordinatorEntity[SamsungDMSCoordinator], FanEntity):
             model="Energy recovery ventilator",
             sw_version=meta.get("version") or None,
         )
+        coordinator.with_via_device(self._attr_device_info, addr)
 
     @property
     def _unit(self) -> dict[str, Any]:

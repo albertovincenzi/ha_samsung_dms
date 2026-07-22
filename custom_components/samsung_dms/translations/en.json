@@ -14,6 +14,14 @@
           "host": "For example 192.168.1.5",
           "verify_ssl": "Leave off — the DMS uses a self-signed certificate."
         }
+      },
+      "reauth_confirm": {
+        "title": "Samsung DMS",
+        "description": "The credentials for the DMS at {host} are no longer valid. Enter the current username and password.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -22,7 +30,21 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "This DMS is already configured."
+      "already_configured": "This DMS is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Samsung DMS options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "How often to poll the DMS (10–600 s). Lower is more responsive but puts more load on the controller."
+        }
+      }
     }
   },
   "entity": {

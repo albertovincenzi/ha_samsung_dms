@@ -126,6 +126,7 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
             model=model,
             sw_version=meta.get("version") or None,
         )
+        coordinator.with_via_device(self._attr_device_info, addr)
 
         # Swing capability is static per unit: a vertical vane exists when the
         # DMS reports an actual airSwing_UD value ("null" means no vane); the
@@ -369,6 +370,7 @@ class SamsungDMSWaterOutClimate(
             model="EHS / hydro unit",
             sw_version=meta.get("version") or None,
         )
+        coordinator.with_via_device(self._attr_device_info, addr)
 
     @property
     def _unit(self) -> dict[str, Any]:

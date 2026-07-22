@@ -21,7 +21,6 @@ from .const import (
     CONF_USERNAME,
     CONF_VERIFY_SSL,
     DEFAULT_VERIFY_SSL,
-    DOMAIN,
 )
 from .coordinator import SamsungDMSCoordinator
 
@@ -76,9 +75,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.runtime_data = coordinator
     entry.async_on_unload(lambda: hass.async_create_task(session.close()))
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry when its options change (e.g. polling interval)."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

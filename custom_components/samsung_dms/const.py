@@ -12,9 +12,17 @@ CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
 CONF_VERIFY_SSL = "verify_ssl"
 
+# Options-flow keys
+CONF_SCAN_INTERVAL = "scan_interval"
+
 DEFAULT_USERNAME = "admin"
 DEFAULT_VERIFY_SSL = False
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+DEFAULT_SCAN_INTERVAL_SECONDS = 30
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SECONDS)
+# Bounds for the user-configurable polling interval. Faster than ~10 s risks
+# overloading the controller; slower than 10 min makes control feel unresponsive.
+MIN_SCAN_INTERVAL_SECONDS = 10
+MAX_SCAN_INTERVAL_SECONDS = 600
 
 # How long to keep an optimistically-set value on top of poll results before
 # accepting the DMS's own reported state. Two poll cycles: enough for the

@@ -51,6 +51,7 @@ class SamsungDMSRemoteLock(CoordinatorEntity[SamsungDMSCoordinator], SwitchEntit
             name=meta.get("name") or f"Samsung {addr}",
             manufacturer="Samsung",
         )
+        coordinator.with_via_device(self._attr_device_info, addr)
 
     @property
     def _unit(self) -> dict[str, Any]:
