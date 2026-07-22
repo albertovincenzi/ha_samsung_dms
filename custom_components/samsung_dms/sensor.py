@@ -40,7 +40,19 @@ class DMSSensorDescription(SensorEntityDescription):
     """Describes a DMS sensor and how to read its value."""
 
     source: str  # monitoring field name
+    text: bool = False  # True for string readings (e.g. operating mode)
     value_fn: Callable[[float], float | int] = lambda v: round(v, 1)
+
+
+# Values the DMS uses to mean "no reading" for string fields.
+_TEXT_ABSENT = (None, "", "null", "none", "false")
+
+
+def _present(value: Any, *, text: bool) -> bool:
+    """Return True when a field carries a usable reading."""
+    if text:
+        return value not in _TEXT_ABSENT
+    return _to_float(value) is not None
 
 
 SENSOR_TYPES: tuple[DMSSensorDescription, ...] = (
@@ -78,6 +90,24 @@ SENSOR_TYPES: tuple[DMSSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # The ERV Plus tempers incoming air but its mode/setpoint are driven by the
+    # connected system and are NOT controllable via the DMS — exposed read-only.
+    DMSSensorDescription(
+        key="setpoint",
+        source="setTemp",
+        translation_key="setpoint",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    DMSSensorDescription(
+        key="operating_mode",
+        source="opMode",
+        translation_key="operating_mode",
+        text=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 
@@ -101,7 +131,7 @@ async def async_setup_entry(
         if coordinator.device_type(addr) != DEVICE_TYPE_PLUSERV:
             continue
         for description in SENSOR_TYPES:
-            if _to_float(unit.get(description.source)) is not None:
+            if _present(unit.get(description.source), text=description.text):
                 entities.append(SamsungDMSSensor(coordinator, addr, description))
     async_add_entities(entities)
 
@@ -139,13 +169,20 @@ class SamsungDMSSensor(CoordinatorEntity[SamsungDMSCoordinator], SensorEntity):
         if not (super().available and self._addr in self.coordinator.data):
             return False
         unit = self.coordinator.data[self._addr]
-        return _to_float(unit.get(self.entity_description.source)) is not None
+        return _present(
+            unit.get(self.entity_description.source),
+            text=self.entity_description.text,
+        )
 
     @property
-    def native_value(self) -> float | int | None:
+    def native_value(self) -> float | int | str | None:
         """Return the current reading."""
-        unit = self.coordinator.data.get(self._addr, {})
-        value = _to_float(unit.get(self.entity_description.source))
+        raw = self.coordinator.data.get(self._addr, {}).get(
+            self.entity_description.source
+        )
+        if self.entity_description.text:
+            return raw if raw not in _TEXT_ABSENT else None
+        value = _to_float(raw)
         if value is None:
             return None
         return self.entity_description.value_fn(value)

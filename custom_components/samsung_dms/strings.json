@@ -53,6 +53,12 @@
       },
       "intake_temperature": {
         "name": "Intake air temperature"
+      },
+      "setpoint": {
+        "name": "Setpoint"
+      },
+      "operating_mode": {
+        "name": "Operating mode"
       }
     }
   }

@@ -27,6 +27,10 @@ Tested against DMS firmware `2.9.1.11`.
   - Ventilation mode as preset (auto / erv / normal / sleep)
   - CO₂, outdoor / air / intake-air temperature sensors (created only when the
     unit actually reports them)
+  - Read-only setpoint and operating-mode sensors — the ERV Plus tempers
+    incoming air, but its mode/setpoint follow the connected system and the DMS
+    exposes no way to control them, so they are surfaced as sensors, not a
+    thermostat
 - **Per-unit `switch`** — remote-controller lock (disable the wall remote)
 - **Per-unit `binary_sensor`** — schedule active indicator
 - **Instant UI feedback** — commands are shown optimistically and confirmed by
