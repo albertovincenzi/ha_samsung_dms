@@ -52,6 +52,14 @@ _MAX_FIELD = {
 # Sentinel the DMS uses for "not applicable" temperatures.
 _INVALID_TEMP = -1000.0
 
+# Friendly model label from the DMS ``subIndoorType`` code.
+_MODEL_LABELS = {
+    "rac": "RAC indoor unit",
+    "duct": "Duct indoor unit",
+    "ehs": "EHS / hydro unit",
+    "": "DVM indoor unit",
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -79,12 +87,19 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
         super().__init__(coordinator)
         self._addr = addr
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{addr}"
+
+        meta = coordinator.metadata.get(addr, {})
+        # unique_id stays address-based so renaming a unit on the DMS never
+        # orphans the entity; only the display name follows the label.
+        name = meta.get("name") or f"Samsung AC {addr}"
+        model = _MODEL_LABELS.get(meta.get("sub_type"), meta.get("sub_type") or "DVM indoor unit")
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._attr_unique_id)},
-            name=f"Samsung AC {addr}",
+            name=name,
             manufacturer="Samsung",
-            model="DVM indoor unit",
-            via_device=(DOMAIN, coordinator.entry.entry_id),
+            model=model,
+            sw_version=meta.get("version") or None,
         )
 
     # -- helpers -------------------------------------------------------------

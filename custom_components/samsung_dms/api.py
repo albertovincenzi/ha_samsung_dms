@@ -208,6 +208,29 @@ class SamsungDMSClient:
         body = _envelope("<treeInfoEx range='all' />")
         return await self._post(PATH_TREEVIEW, body)
 
+    async def async_get_indoor_metadata(self) -> dict[str, dict[str, Any]]:
+        """Return per-unit metadata keyed by address.
+
+        The ``treeIndoor`` section of the tree view is a flat list that maps
+        each address to its user-assigned label plus model info — the reliable
+        source for friendly names (the ``treeViewName`` tree is order-dependent
+        and unsafe to parse).
+        """
+        tree = await self.async_get_tree()
+        meta: dict[str, dict[str, Any]] = {}
+        for entry in tree.get("treeIndoor", []):
+            addr = entry.get("addr")
+            if not addr:
+                continue
+            meta[addr] = {
+                "name": (entry.get("name") or "").strip() or addr,
+                "sub_type": entry.get("subIndoorType") or "",
+                "indoor_type": entry.get("indoorType") or "indoor",
+                "model_code": (entry.get("modelCode") or "").strip(),
+                "version": entry.get("version") or "",
+            }
+        return meta
+
     async def async_control(
         self, addresses: list[str], control_values: dict[str, str]
     ) -> None:

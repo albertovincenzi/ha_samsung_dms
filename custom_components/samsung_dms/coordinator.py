@@ -33,6 +33,16 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         )
         self.client = client
         self.entry = entry
+        # addr -> {name, sub_type, indoor_type, model_code, version}
+        self.metadata: dict[str, dict[str, Any]] = {}
+
+    async def async_load_metadata(self) -> None:
+        """Load per-unit labels/models once at setup (best-effort)."""
+        try:
+            self.metadata = await self.client.async_get_indoor_metadata()
+        except SamsungDMSError as err:
+            _LOGGER.warning("Could not load Samsung DMS device names: %s", err)
+            self.metadata = {}
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch the latest monitoring snapshot, keyed by address."""

@@ -59,6 +59,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady(str(err)) from err
 
     coordinator = SamsungDMSCoordinator(hass, entry, client)
+    # Friendly names/models come from a separate tree-view call; load once.
+    await coordinator.async_load_metadata()
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception:
