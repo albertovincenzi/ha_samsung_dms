@@ -31,6 +31,8 @@ PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.WATER_HEATER,
     Platform.FAN,
+    Platform.SWITCH,
+    Platform.BINARY_SENSOR,
 ]
 
 

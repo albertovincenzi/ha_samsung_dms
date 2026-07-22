@@ -30,6 +30,16 @@
       "space_heating": {
         "name": "Space heating"
       }
+    },
+    "switch": {
+      "remote_lock": {
+        "name": "Remote lock"
+      }
+    },
+    "binary_sensor": {
+      "scheduled": {
+        "name": "Scheduled"
+      }
     }
   }
 }

@@ -25,6 +25,8 @@ Tested against DMS firmware `2.9.1.11`.
 - **Energy-recovery ventilators (pluserv) → `fan`**
   - On/off, fan speed (low / mid / high / turbo)
   - Ventilation mode as preset (auto / erv / normal / sleep)
+- **Per-unit `switch`** — remote-controller lock (disable the wall remote)
+- **Per-unit `binary_sensor`** — schedule active indicator
 - Session auto-recovery (re-login on cookie expiry)
 
 ## Installation
@@ -90,10 +92,9 @@ integration speaks the same protocol directly.
 
 ## Not yet implemented
 
-- The space-heating (water-out) side of EHS units as a separate `climate`
-  entity (currently only the domestic-hot-water side is exposed)
-- Vertical/horizontal swing controls
-- Schedules and use-restriction (remote lock) as switches
+- Creating/editing DMS schedules from Home Assistant (the schedule state is
+  exposed read-only; schedules are still managed on the DMS itself)
+- Energy metering / power-usage data
 
 ## Disclaimer
 
