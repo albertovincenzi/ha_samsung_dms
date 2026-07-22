@@ -74,7 +74,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise
 
     entry.runtime_data = coordinator
-    entry.async_on_unload(lambda: hass.async_create_task(session.close()))
+    # ``session.close`` is a coroutine function; HA awaits it during unload.
+    entry.async_on_unload(session.close)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

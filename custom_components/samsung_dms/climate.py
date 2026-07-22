@@ -117,7 +117,9 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
         # unique_id stays address-based so renaming a unit on the DMS never
         # orphans the entity; only the display name follows the label.
         name = meta.get("name") or f"Samsung AC {addr}"
-        model = _MODEL_LABELS.get(meta.get("sub_type"), meta.get("sub_type") or "DVM indoor unit")
+        model = _MODEL_LABELS.get(
+            meta.get("sub_type"), meta.get("sub_type") or "DVM indoor unit"
+        )
 
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._attr_unique_id)},

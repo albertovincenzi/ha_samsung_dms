@@ -140,7 +140,7 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         except SamsungDMSError as err:
             _LOGGER.debug("Outdoor cycle poll failed: %s", err)
             return
-        for addr, unit in cycle.items():
+        for unit in cycle.values():
             health = assess_outdoor(unit)
             unit["health_status"] = health.status
             unit["health_issues"] = list(health.issues)

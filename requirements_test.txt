@@ -1,0 +1,4 @@
+# Test dependencies. pytest-homeassistant-custom-component pins a matching
+# Home Assistant release, so this single dependency pulls in HA + pytest tooling.
+pytest-homeassistant-custom-component
+pytest-cov
