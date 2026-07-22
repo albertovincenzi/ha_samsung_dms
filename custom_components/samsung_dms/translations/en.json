@@ -24,5 +24,12 @@
     "abort": {
       "already_configured": "This DMS is already configured."
     }
+  },
+  "entity": {
+    "climate": {
+      "space_heating": {
+        "name": "Space heating"
+      }
+    }
   }
 }
