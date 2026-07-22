@@ -3,9 +3,9 @@
   "name": "Samsung DMS",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/avincenzi/ha_samsung",
+  "documentation": "https://github.com/albertovincenzi/hs_samsung_dms",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/avincenzi/ha_samsung/issues",
+  "issue_tracker": "https://github.com/albertovincenzi/hs_samsung_dms/issues",
   "requirements": [],
   "version": "0.1.0"
 }
