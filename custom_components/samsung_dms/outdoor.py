@@ -26,7 +26,9 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
+    UnitOfEnergy,
     UnitOfFrequency,
+    UnitOfPower,
     UnitOfPressure,
     UnitOfTemperature,
     UnitOfTime,
@@ -81,6 +83,27 @@ class OutdoorSensorDescription(SensorEntityDescription):
 
 
 OUTDOOR_SENSORS: tuple[OutdoorSensorDescription, ...] = (
+    # Real power / energy metering reported by the DMS (PPD). One-minute mean
+    # power in W; accumulated energy in Wh -> exposed as kWh for the Energy
+    # Dashboard.
+    OutdoorSensorDescription(
+        key="power",
+        source="outdoorOneMinPowerMeterValue",
+        translation_key="power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda v: round(v),
+    ),
+    OutdoorSensorDescription(
+        key="energy",
+        source="outdoorAccumPowerMeterValue",
+        translation_key="energy",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda v: round(v / 1000.0, 1),
+    ),
     OutdoorSensorDescription(
         key="outside_temperature",
         source="outsideTemp",

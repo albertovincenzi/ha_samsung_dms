@@ -270,6 +270,12 @@ class SamsungDMSClimate(CoordinatorEntity[SamsungDMSCoordinator], ClimateEntity)
             "filter_warning": unit.get("filterWarning"),
             "remote_control_enabled": unit.get("remoconEnable"),
             "scheduled": unit.get("isScheduled"),
+            # Guest setpoint guardrails (DMS "use limit"): the range a wall
+            # remote is allowed to set. Read-only here; managed on the DMS.
+            "guest_temp_limited": unit.get("isTempLimited"),
+            "guest_mode_limited": unit.get("useOpModeLimit"),
+            "guest_min_temp": self._to_float(unit.get("lowerTemperature")),
+            "guest_max_temp": self._to_float(unit.get("upperTemperature")),
         }
 
     # -- commands ------------------------------------------------------------

@@ -44,6 +44,10 @@ PATH_MONITORING = "/dms2/getMonitoring?currentPage=main"
 PATH_TREEVIEW = "/dms2/getTreeView?currentPage=main"
 # Outdoor "cycle monitoring" data — note the DMS's own spelling of the path.
 PATH_CYCLE = "/dms2/getControlMonitring"
+# Guest "use limit" (setpoint guardrails) — an HTML form page, not a JSON API.
+# Saving is a whole-form POST (mode=save) that echoes every unit's row, so a
+# single-room change must round-trip the full form.
+PATH_USELIMIT = "/dms2/controlmonitoring/indoorUseLimit.jsp"
 
 # --- Samsung <-> Home Assistant enum mappings -------------------------------
 

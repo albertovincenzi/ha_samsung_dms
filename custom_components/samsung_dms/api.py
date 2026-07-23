@@ -16,7 +16,9 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlencode
 
 import aiohttp
 
@@ -26,6 +28,7 @@ from .const import (
     PATH_MONITORING,
     PATH_ROOT,
     PATH_TREEVIEW,
+    PATH_USELIMIT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,6 +72,52 @@ def _envelope(payload: str) -> str:
 def _address_list(addresses: list[str]) -> str:
     inner = "".join(f"<address>{addr}</address>" for addr in addresses)
     return f"<addressList>{inner}</addressList>"
+
+
+class _UseLimitForm(HTMLParser):
+    """Parse the ``indoorUseLimit.jsp`` form into ordered (name, value) pairs.
+
+    Inputs keep their ``value``; selects resolve to their selected option (or
+    the first option). Order is preserved so the form can be posted back
+    verbatim with only the targeted rows changed.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.fields: list[list[str]] = []
+        self._sel: str | None = None
+        self._sel_val: str | None = None
+        self._opts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        a = dict(attrs)
+        if tag == "input":
+            name = a.get("name")
+            if not name:
+                return
+            input_type = (a.get("type") or "text").lower()
+            if input_type in ("checkbox", "radio"):
+                if "checked" in a:
+                    self.fields.append([name, a.get("value") or "on"])
+            else:
+                self.fields.append([name, a.get("value") or ""])
+        elif tag == "select":
+            self._sel = a.get("name")
+            self._sel_val = None
+            self._opts = []
+        elif tag == "option" and self._sel is not None:
+            value = a.get("value") or ""
+            if "selected" in a:
+                self._sel_val = value
+            self._opts.append(value)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "select" and self._sel is not None:
+            value = self._sel_val
+            if value is None:
+                value = self._opts[0] if self._opts else ""
+            self.fields.append([self._sel, value])
+            self._sel = None
 
 
 class SamsungDMSClient:
@@ -264,6 +313,109 @@ class SamsungDMSClient:
             merged["commError"] = addr in comm_errors
             result[addr] = merged
         return result
+
+    async def _get_text(self, path: str, *, _retry: bool = True) -> str:
+        """GET a page and return its text, re-authenticating once on session loss."""
+        if not self._authenticated:
+            await self.async_login()
+        try:
+            async with self._session.get(
+                self._base + path, timeout=_TIMEOUT
+            ) as resp:
+                if resp.status in (401, 403):
+                    raise SamsungDMSAuthError(f"HTTP {resp.status}")
+                resp.raise_for_status()
+                text = await resp.text()
+        except SamsungDMSAuthError:
+            if _retry:
+                self._authenticated = False
+                await self.async_login()
+                return await self._get_text(path, _retry=False)
+            raise
+        except aiohttp.ClientError as err:
+            raise SamsungDMSConnectionError(str(err)) from err
+        if "Login.jsp" in text and _retry:
+            self._authenticated = False
+            await self.async_login()
+            return await self._get_text(path, _retry=False)
+        return text
+
+    async def _post_form(self, path: str, body: list[tuple[str, str]]) -> str:
+        """POST a form-urlencoded body (for the HTML JSP feature pages)."""
+        if not self._authenticated:
+            await self.async_login()
+        data = urlencode(body).encode("utf-8")
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        try:
+            async with self._session.post(
+                self._base + path, data=data, headers=headers, timeout=_TIMEOUT
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.text()
+        except aiohttp.ClientError as err:
+            raise SamsungDMSConnectionError(str(err)) from err
+
+    async def async_get_use_limits(self) -> dict[str, dict[str, str]]:
+        """Return current guest use-limits keyed by unit address.
+
+        Each value has ``coolLowerTemp``/``coolUpperTemp``/``heatLowerTemp``/
+        ``heatUpperTemp``/``operationModeLimit`` as strings.
+        """
+        parser = _UseLimitForm()
+        parser.feed(await self._get_text(PATH_USELIMIT))
+        rows: dict[str, dict[str, str]] = {}
+        index_addr: dict[str, str] = {}
+        for name, value in parser.fields:
+            if name.startswith("indoorId_"):
+                index_addr[name.split("_", 1)[1]] = value
+        wanted = (
+            "coolLowerTemp",
+            "coolUpperTemp",
+            "heatLowerTemp",
+            "heatUpperTemp",
+            "operationModeLimit",
+        )
+        for name, value in parser.fields:
+            for base in wanted:
+                if name.startswith(base + "_"):
+                    idx = name[len(base) + 1 :]
+                    addr = index_addr.get(idx)
+                    if addr:
+                        rows.setdefault(addr, {})[base] = value
+        return rows
+
+    async def async_set_use_limits(
+        self, changes: dict[str, dict[str, str]]
+    ) -> None:
+        """Apply per-address use-limit changes via a whole-form round-trip.
+
+        ``changes`` maps a unit address to the fields to override, e.g.
+        ``{"11.00.08": {"coolLowerTemp": "22.0", "coolUpperTemp": "28.0"}}``.
+        Every other field on the page is echoed back unchanged, so only the
+        named rows/fields are modified.
+        """
+        parser = _UseLimitForm()
+        parser.feed(await self._get_text(PATH_USELIMIT))
+        fields = parser.fields
+        index_addr = {
+            name.split("_", 1)[1]: value
+            for name, value in fields
+            if name.startswith("indoorId_")
+        }
+        addr_index = {addr: idx for idx, addr in index_addr.items()}
+        overrides: dict[str, str] = {}
+        for addr, vals in changes.items():
+            idx = addr_index.get(addr)
+            if idx is None:
+                _LOGGER.warning("Use-limit: address %s not on the page", addr)
+                continue
+            for base, val in vals.items():
+                overrides[f"{base}_{idx}"] = str(val)
+        body = [(name, overrides.get(name, value)) for name, value in fields]
+        body = [(n, "save" if n == "mode" else v) for n, v in body]
+        if not any(n == "mode" for n, _ in body):
+            body.append(("mode", "save"))
+        await self._post_form(PATH_USELIMIT, body)
 
     async def async_get_indoor_metadata(self) -> dict[str, dict[str, Any]]:
         """Return per-unit metadata keyed by address.

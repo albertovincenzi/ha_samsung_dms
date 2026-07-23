@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 
 import aiohttp
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import ATTR_ENTITY_ID, Platform
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 
 from .api import (
     SamsungDMSAuthError,
@@ -21,6 +23,7 @@ from .const import (
     CONF_USERNAME,
     CONF_VERIFY_SSL,
     DEFAULT_VERIFY_SSL,
+    DOMAIN,
 )
 from .coordinator import SamsungDMSCoordinator
 
@@ -34,6 +37,55 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.SENSOR,
 ]
+
+SERVICE_SET_USE_LIMIT = "set_use_limit"
+# service field -> DMS form field
+_LIMIT_FIELDS = {
+    "cool_min": "coolLowerTemp",
+    "cool_max": "coolUpperTemp",
+    "heat_min": "heatLowerTemp",
+    "heat_max": "heatUpperTemp",
+}
+_SET_USE_LIMIT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+        vol.Optional("cool_min"): vol.Coerce(float),
+        vol.Optional("cool_max"): vol.Coerce(float),
+        vol.Optional("heat_min"): vol.Coerce(float),
+        vol.Optional("heat_max"): vol.Coerce(float),
+    }
+)
+
+
+async def _async_register_services(hass: HomeAssistant) -> None:
+    """Register integration services once."""
+    if hass.services.has_service(DOMAIN, SERVICE_SET_USE_LIMIT):
+        return
+
+    async def _handle_set_use_limit(call: ServiceCall) -> None:
+        overrides = {
+            form_field: f"{float(call.data[svc_field]):.1f}"
+            for svc_field, form_field in _LIMIT_FIELDS.items()
+            if svc_field in call.data
+        }
+        if not overrides:
+            return
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator = getattr(entry, "runtime_data", None)
+            if coordinator is None:
+                continue
+            changes: dict[str, dict[str, str]] = {}
+            for entity_id in call.data[ATTR_ENTITY_ID]:
+                state = hass.states.get(entity_id)
+                addr = state and state.attributes.get("address")
+                if addr:
+                    changes[addr] = dict(overrides)
+            if changes:
+                await coordinator.async_set_use_limits(changes)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_USE_LIMIT, _handle_set_use_limit, schema=_SET_USE_LIMIT_SCHEMA
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -79,6 +131,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _async_register_services(hass)
     return True
 
 

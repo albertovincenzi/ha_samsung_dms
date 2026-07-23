@@ -23,9 +23,17 @@ from .const import (
     DOMAIN,
     OPTIMISTIC_TTL_SECONDS,
 )
-from .vrf_health import assess_outdoor
+from .vrf_health import STATUS_ALERT, STATUS_OK, assess_outdoor
 
 _LOGGER = logging.getLogger(__name__)
+
+# Verdict persistence (hysteresis) for outdoor health, in consecutive polls.
+# A VRF unit can momentarily cross a cycle threshold during modulation; require
+# the condition to hold before raising a warning, and to clear before dropping
+# it (~90 s each at the 30 s scan interval). ALERT-level conditions (comm error,
+# extreme temperatures) bypass the raise delay for safety.
+_HEALTH_RAISE_POLLS = 3
+_HEALTH_CLEAR_POLLS = 3
 
 
 class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
@@ -56,6 +64,7 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         self.outdoor: dict[str, dict[str, Any]] = {}
         # Pending optimistic overrides (monitoring-key space) applied on top of
         # each poll until the DMS confirms them or they age out. Keyed by addr.
+        self._health_streak: dict[str, dict[str, Any]] = {}
         self._optimistic: dict[str, dict[str, Any]] = {}
         self._optimistic_until: dict[str, float] = {}
 
@@ -140,12 +149,41 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         except SamsungDMSError as err:
             _LOGGER.debug("Outdoor cycle poll failed: %s", err)
             return
-        for unit in cycle.values():
+        for addr, unit in cycle.items():
             health = assess_outdoor(unit)
-            unit["health_status"] = health.status
-            unit["health_issues"] = list(health.issues)
+            status, issues = self._debounce_health(addr, health)
+            unit["health_status"] = status
+            unit["health_issues"] = list(issues)
             unit["health_metrics"] = health.metrics
         self.outdoor = cycle
+
+    def _debounce_health(
+        self, addr: str, health: Any
+    ) -> tuple[str, tuple[str, ...]]:
+        """Smooth a raw health verdict with per-unit hysteresis.
+
+        Raises to warning only after ``_HEALTH_RAISE_POLLS`` consecutive non-ok
+        assessments and clears only after ``_HEALTH_CLEAR_POLLS`` consecutive ok
+        ones, so a transient threshold crossing during VRF modulation does not
+        flap the ``maintenance`` flag. ALERT conditions escalate immediately.
+        """
+        streak = self._health_streak.setdefault(
+            addr, {"status": STATUS_OK, "bad": 0, "ok": 0, "issues": ()}
+        )
+        if health.status == STATUS_OK:
+            streak["ok"] += 1
+            streak["bad"] = 0
+            if streak["status"] != STATUS_OK and streak["ok"] >= _HEALTH_CLEAR_POLLS:
+                streak["status"] = STATUS_OK
+                streak["issues"] = ()
+        else:
+            streak["bad"] += 1
+            streak["ok"] = 0
+            streak["issues"] = health.issues
+            if health.status == STATUS_ALERT or streak["bad"] >= _HEALTH_RAISE_POLLS:
+                streak["status"] = health.status
+        issues = streak["issues"] if streak["status"] != STATUS_OK else ()
+        return streak["status"], issues
 
     def _apply_optimistic(
         self, addr: str, unit: dict[str, Any]
@@ -200,4 +238,11 @@ class SamsungDMSCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
 
     async def _async_confirm_refresh(self, _now: Any) -> None:
         """Trigger a post-command confirmation poll (debouncer-coalesced)."""
+        await self.async_request_refresh()
+
+    async def async_set_use_limits(
+        self, changes: dict[str, dict[str, str]]
+    ) -> None:
+        """Apply guest use-limit changes and refresh state."""
+        await self.client.async_set_use_limits(changes)
         await self.async_request_refresh()

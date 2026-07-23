@@ -79,6 +79,12 @@
       }
     },
     "sensor": {
+      "power": {
+        "name": "Power"
+      },
+      "energy": {
+        "name": "Energy"
+      },
       "co2": {
         "name": "CO2"
       },

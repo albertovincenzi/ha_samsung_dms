@@ -33,8 +33,15 @@ _INVALID = -999.0  # DMS uses -1000 for "not available"
 # Thresholds (cooling-mode, R410A).
 _DISCHARGE_WARN, _DISCHARGE_ALERT = 95.0, 110.0
 _IPM_WARN, _IPM_ALERT = 80.0, 90.0
-_APPROACH_WARN, _APPROACH_ALERT = 15.0, 22.0  # condenser fouling
-_SUPERHEAT_LOW, _SUPERHEAT_HIGH = 1.0, 15.0
+_APPROACH_WARN, _APPROACH_ALERT = 16.0, 24.0  # condenser fouling
+# Combined-suction superheat is NOT a reliable charge gauge on VRF (it mixes the
+# return gas of every running indoor EEV over pipe runs up to ~220 m); only very
+# low (floodback) or very high (extreme) values are actionable.
+_SUPERHEAT_LOW, _SUPERHEAT_HIGH = 1.0, 30.0
+# Below this compressor frequency the unit is starting / oil-returning / at very
+# low part-load: cycle-quality readings are transient. Compute the metrics for
+# display, but do not let them escalate the verdict.
+_MIN_STEADY_HZ = 25.0
 
 STATUS_OK = "ok"
 STATUS_WARNING = "warning"
@@ -89,6 +96,10 @@ def assess_outdoor(unit: dict[str, Any]) -> OutdoorHealth:
 
     cooling = str(unit.get("opMode", "cool")).lower() != "heat"
     running = str(unit.get("comp1", "false")).lower() == "true"
+    # Steady state = compressor above the ramp/oil-return band. Only then are the
+    # cycle-quality checks (approach, superheat) meaningful on a modulating VRF.
+    frequency = _f(unit, "compCurrentFrequency1")
+    steady = running and (frequency is None or frequency >= _MIN_STEADY_HZ)
 
     high = _f(unit, "highPressure")
     low = _f(unit, "lowPressure")
@@ -128,16 +139,19 @@ def assess_outdoor(unit: dict[str, Any]) -> OutdoorHealth:
 
     # Cooling-only cycle checks (roles swap in heating; skip to avoid false
     # positives on a reversed circuit).
+    # Metrics are computed whenever the compressor runs (for display); they only
+    # ESCALATE the verdict at steady state, so ramp/oil-return transients on a
+    # modulating VRF unit don't raise spurious maintenance flags.
     if cooling and running and cond_temp is not None and ambient is not None:
         approach = round(cond_temp - ambient, 1)
         metrics["condenser_approach"] = approach
-        if approach >= _APPROACH_ALERT:
+        if steady and approach >= _APPROACH_ALERT:
             issues.append(
                 f"Condenser approach {approach:.0f} K — coil likely dirty or "
                 "airflow blocked; cleaning recommended"
             )
             status = _escalate(status, STATUS_ALERT)
-        elif approach >= _APPROACH_WARN:
+        elif steady and approach >= _APPROACH_WARN:
             issues.append(
                 f"Condenser approach {approach:.0f} K — check/clean the "
                 "outdoor coil"
@@ -147,14 +161,15 @@ def assess_outdoor(unit: dict[str, Any]) -> OutdoorHealth:
     if cooling and running and evap_temp is not None and suction is not None:
         superheat = round(suction - evap_temp, 1)
         metrics["suction_superheat"] = superheat
-        if superheat < _SUPERHEAT_LOW:
+        if steady and superheat < _SUPERHEAT_LOW:
             issues.append(
                 f"Low suction superheat ({superheat:.0f} K) — liquid floodback risk"
             )
             status = _escalate(status, STATUS_WARNING)
-        elif superheat > _SUPERHEAT_HIGH:
+        elif steady and superheat > _SUPERHEAT_HIGH:
             issues.append(
-                f"High suction superheat ({superheat:.0f} K) — possible low charge"
+                f"Very high suction superheat ({superheat:.0f} K) — verify charge "
+                "/ EEV operation"
             )
             status = _escalate(status, STATUS_WARNING)
 
